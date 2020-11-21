@@ -5,7 +5,6 @@ import gym
 import os
 import json
 
-from scipy.misc import imresize as resize
 from scipy.misc import toimage as toimage
 from gym.spaces.box import Box
 from gym.utils import seeding
@@ -128,7 +127,7 @@ class CarRacingDream(gym.Env):
 
     img = self.decode_obs(self.z)
 
-    img = resize(img, (int(np.round(SCREEN_Y*FACTOR)), int(np.round(SCREEN_X*FACTOR))))
+    img = numpy.array(Image.fromarray(arr).resize(int(np.round(SCREEN_Y*FACTOR)), int(np.round(SCREEN_X*FACTOR))))
 
     if self.frame_count > 0:
       pass
