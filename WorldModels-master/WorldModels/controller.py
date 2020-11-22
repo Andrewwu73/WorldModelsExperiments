@@ -7,7 +7,7 @@ import sys
 from env import make_env
 import time
 
-from rnn.rnn import MDNRNN
+from rnn.rnn import MDNRNN, rnn_output
 
 # controls whether we concatenate (z, c, h), etc for features used for car.
 MODE_ZCH = 0
@@ -33,7 +33,6 @@ class Controller:
     self.z_size = args.z_size
     self.a_width = args.a_width
     self.args = args
-
     if self.exp_mode == MODE_Z_HIDDEN: # one hidden layer
       self.hidden_size = 40
       self.weight_hidden = np.random.randn(self.input_size, self.hidden_size)
@@ -45,8 +44,8 @@ class Controller:
       self.weight = np.random.randn(self.input_size, self.a_width)
       self.bias = np.random.randn(self.a_width)
       self.param_count = (self.input_size)*self.a_width+self.a_width
-
     self.render_mode = args.render_mode
+#    print(self.weight)
 
   def get_action(self, h):
     '''
@@ -59,6 +58,8 @@ class Controller:
       h = np.tanh(np.dot(h, self.weight_hidden) + self.bias_hidden)
       action = np.tanh(np.dot(h, self.weight_output) + self.bias_output)
     else:
+      #print(h)
+      #print(self.weight.shape)
       action = np.tanh(np.dot(h, self.weight) + self.bias)
     
     if 'CarRacing' in self.env_name:

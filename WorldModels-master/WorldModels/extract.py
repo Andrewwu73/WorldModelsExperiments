@@ -42,13 +42,14 @@ for trial in range(args.max_trials):
       repeat = np.random.randint(1, 11)
 
     tot_r = 0
-    [obs, frame] = env.reset() # pixels
+    obs, frame = env.reset() # pixels
 
     for i in range(args.max_frames):
-      if args.render_mode:
-        env.render("human")
-      else:
-        env.render("rgb_array")
+      #print(obs.shape)
+      # if args.render_mode:
+      #   env.render("human")
+      # else:
+      #   env.render("rgb_array")
 
       if 'CarRacing' in args.env_name:
         recording_N.append(env.N_tiles)
@@ -66,7 +67,9 @@ for trial in range(args.max_trials):
 
       recording_action.append(action)
 
-      [obs, frame], reward, done, info = env.step(action)
+      [obs, frame], reward, done, info = env._step(action)
+      #print(obs)
+      #print(env.step(action))
       tot_r += reward
 
       recording_reward.append(reward)

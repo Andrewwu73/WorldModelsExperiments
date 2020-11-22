@@ -3,13 +3,14 @@
 import numpy as np
 import tensorflow as tf
 import os
-
+from tensorflow.keras import backend as K
+K.set_floatx('float32')
 class CVAE(tf.keras.Model):
     '''
     convolutional variational auto encoder
     '''
     def __init__(self, args):
-         
+        K.set_floatx('float32')
         self.z_size = args.z_size
         self.learning_rate = args.vae_learning_rate
         self.kl_tolerance = args.vae_kl_tolerance

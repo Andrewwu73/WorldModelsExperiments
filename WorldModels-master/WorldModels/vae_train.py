@@ -24,6 +24,7 @@ def ds_gen():
                 img_i = img / 255.0
                 yield img_i
 if __name__ == "__main__": 
+    print(tf.__version__)
     model_save_path = "results/{}/{}/tf_vae".format(args.exp_name, args.env_name)
     if not os.path.exists(model_save_path):
         os.makedirs(model_save_path)
