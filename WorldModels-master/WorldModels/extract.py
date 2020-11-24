@@ -46,10 +46,10 @@ for trial in range(args.max_trials):
 
     for i in range(args.max_frames):
       #print(obs.shape)
-      # if args.render_mode:
-      #   env.render("human")
-      # else:
-      #   env.render("rgb_array")
+      if args.render_mode:
+         env.render("human")
+       else:
+         env.render("rgb_array")
 
       if 'CarRacing' in args.env_name:
         recording_N.append(env.N_tiles)

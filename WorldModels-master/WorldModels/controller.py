@@ -124,7 +124,7 @@ def simulate(controller, env, train_mode=False, render_mode=True, num_episode=5,
         env.render('rgb_array')
 
       action = controller.get_action(obs)
-      obs, reward, done, info = env.step(action)
+      obs, reward, done, info = env._step(action)
 
       total_reward += reward
       if done:
