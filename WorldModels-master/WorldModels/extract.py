@@ -48,7 +48,7 @@ for trial in range(args.max_trials):
       #print(obs.shape)
       if args.render_mode:
          env.render("human")
-       else:
+      else:
          env.render("rgb_array")
 
       if 'CarRacing' in args.env_name:

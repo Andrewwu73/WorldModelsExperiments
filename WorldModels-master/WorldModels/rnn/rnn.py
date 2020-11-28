@@ -23,10 +23,10 @@ class MDNRNN(tf.keras.Model):
         super(MDNRNN, self).__init__()
         self.args = args
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.args.rnn_learning_rate, clipvalue=self.args.rnn_grad_clip)
-        
-        self.loss_fn = self.get_loss() 
+
+        self.loss_fn = self.get_loss()
         self.inference_base = tf.keras.layers.LSTM(units=args.rnn_size, return_sequences=True, return_state=True, time_major=False)
-        rnn_out_size = args.rnn_num_mixture * args.z_size * 3 + args.rnn_r_pred + args.rnn_d_pred # 3 comes from pi, mu, std 
+        rnn_out_size = (args.rnn_num_mixture * args.z_size * 3) *args.rnn_num_time_steps + args.rnn_r_pred + args.rnn_d_pred # 3 comes from pi, mu, std
         self.out_net = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=self.args.rnn_size),
             tf.keras.layers.Dense(rnn_out_size, name="mu_logstd_logmix_net")])
@@ -36,7 +36,7 @@ class MDNRNN(tf.keras.Model):
         batch_size = self.args.rnn_batch_size
         z_size = self.args.z_size
         d_true_weight = self.args.rnn_d_true_weight
-        
+
         """Construct a loss functions for the MDN layer parametrised by number of mixtures."""
         # Construct a loss function with the right number of mixtures and outputs
         def z_loss_func(y_true, y_pred):
@@ -49,27 +49,27 @@ class MDNRNN(tf.keras.Model):
             # Reshape inputs in case this is used in a TimeDistribued layer
             mdnrnn_params = tf.reshape(mdnrnn_params, [-1, 3*num_mixture], name='reshape_ypreds')
             vae_z, mask = tf.reshape(z_true, [-1, 1]), tf.reshape(mask, [-1, 1])
-            
+
             out_mu, out_logstd, out_logpi = tf.split(mdnrnn_params, num_or_size_splits=3, axis=1, name='mdn_coef_split')
             out_logpi = out_logpi - tf.reduce_logsumexp(input_tensor=out_logpi, axis=1, keepdims=True) # normalize
             logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
             lognormal = -0.5 * ((vae_z - out_mu) / tf.exp(out_logstd)) ** 2 - out_logstd - logSqrtTwoPI
             v = out_logpi + lognormal
-            
+
             z_loss = -tf.reduce_logsumexp(input_tensor=v, axis=1, keepdims=True)
             mask = tf.reshape(tf.tile(mask, [1, z_size]), [-1, 1]) # tile b/c we consider z_loss is flattene
             z_loss = mask * z_loss # don't train if episode ends
-            z_loss = tf.reduce_sum(z_loss) / tf.reduce_sum(mask) 
+            z_loss = tf.reduce_sum(z_loss) / tf.reduce_sum(mask)
             return z_loss
         def d_loss_func(y_true, y_pred):
             d_pred = y_pred
             y_true = tf.reshape(y_true, [batch_size, -1, 1 + 1]) # b/c tf is stupid
             d_true, mask = y_true[:, :, :-1], y_true[:, :, -1:]
             d_true, mask = tf.reshape(d_true, [-1, 1]), tf.reshape(mask, [-1, 1])
-           
-            d_loss = tf.nn.weighted_cross_entropy_with_logits(labels=d_true, logits=d_pred, pos_weight=d_true_weight) 
+
+            d_loss = tf.nn.weighted_cross_entropy_with_logits(labels=d_true, logits=d_pred, pos_weight=d_true_weight)
             d_loss = mask * d_loss
-            d_loss = tf.reduce_sum(d_loss) / tf.reduce_sum(mask) # mean of unmasked 
+            d_loss = tf.reduce_sum(d_loss) / tf.reduce_sum(mask) # mean of unmasked
             return d_loss
         def r_loss_func(y_true, y_pred):
             r_pred = y_pred
@@ -80,7 +80,10 @@ class MDNRNN(tf.keras.Model):
             r_loss = mask * r_loss
             r_loss = tf.reduce_sum(r_loss) / tf.reduce_sum(mask)
             return r_loss
-        losses = {'MDN': z_loss_func}
+        losses = {}
+        for i in range(self.args.rnn_num_time_steps):
+            losses['MDN' + str(i)] = z_loss_func
+        #losses = {'MDN': z_loss_func}
         if self.args.rnn_r_pred == 1:
             losses['r'] = r_loss_func
         if self.args.rnn_d_pred == 1:
@@ -91,14 +94,17 @@ class MDNRNN(tf.keras.Model):
         rand_params = []
         for param_i in params:
             # David's spicy initialization scheme is wild but from preliminary experiments is critical
-            sampled_param = np.random.standard_cauchy(param_i.shape)*stdev / 10000.0 
+            sampled_param = np.random.standard_cauchy(param_i.shape)*stdev / 10000.0
             rand_params.append(sampled_param) # spice things up
-          
+
         self.set_weights(rand_params)
-   
+
     def parse_rnn_out(self, out):
-        mdnrnn_param_width = self.args.rnn_num_mixture * self.args.z_size * 3 # 3 comes from pi, mu, std 
-        mdnrnn_params = out[:, :mdnrnn_param_width]
+        mdnrnn_param_width = self.args.rnn_num_mixture * self.args.z_size * 3 # 3 comes from pi, mu, std
+        #mdnrnn_params = out[:, :mdnrnn_param_width]
+        mdnrnn_params = []
+        for i in range(self.args.rnn_num_time_steps):
+            mdnrnn_params.append(out[:,mdnrnn_param_width*i:mdnrnn_param_width*(i+1)])
         if self.args.rnn_r_pred == 1:
             r = out[:, mdnrnn_param_width:mdnrnn_param_width+self.args.rnn_r_pred]
         else:
@@ -115,8 +121,10 @@ class MDNRNN(tf.keras.Model):
         rnn_out = tf.reshape(rnn_out, [-1, self.args.rnn_size])
         out = self.out_net(rnn_out)
         mdnrnn_params, r, d_logits = self.parse_rnn_out(out)
-       
-        outputs = {'MDN': mdnrnn_params} # can't output None b/c tfkeras redirrects to loss for optimization 
+        outputs = {}
+        for i, param in enumerate(mdnrnn_params):
+            outputs['MDN'+str(i)] = param
+        #outputs = {'MDN': mdnrnn_params} # can't output None b/c tfkeras redirrects to loss for optimization
         if self.args.rnn_r_pred == 1:
             outputs['r'] = r
         if self.args.rnn_d_pred == 1:
@@ -131,7 +139,7 @@ def rnn_next_state(rnn, z, a, prev_state):
     return [h, c]
 @tf.function
 def rnn_init_state(rnn):
-  return rnn.inference_base.cell.get_initial_state(batch_size=1, dtype=tf.float32) 
+  return rnn.inference_base.cell.get_initial_state(batch_size=1, dtype=tf.float32)
 def rnn_output(state, z, mode):
   state_h, state_c = state[0], state[1]
   if mode == MODE_ZCH:
@@ -142,7 +150,7 @@ def rnn_output(state, z, mode):
     return np.concatenate([z, state_h[0]])
   return z # MODE_Z or MODE_Z_HIDDEN
 @tf.function
-def rnn_sim(rnn, z, states, a, training=True): 
+def rnn_sim(rnn, z, states, a, training=True):
   z = tf.reshape(tf.cast(z, dtype=tf.float32), (1, 1, rnn.args.z_size))
   a = tf.reshape(tf.cast(a, dtype=tf.float32), (1, 1, rnn.args.a_width))
   input_x = tf.concat((z, a), axis=2)
@@ -164,12 +172,12 @@ def rnn_sim(rnn, z, states, a, training=True):
   mus = tf.split(mu, num_or_size_splits=component_splits, axis=1)
 
   # temperature
-  sigs = tf.split(tf.exp(logstd) * tf.sqrt(rnn.args.rnn_temperature), component_splits, axis=1) 
+  sigs = tf.split(tf.exp(logstd) * tf.sqrt(rnn.args.rnn_temperature), component_splits, axis=1)
 
   coll = [tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale) for loc, scale in zip(mus, sigs)]
   mixture = tfd.Mixture(cat=cat, components=coll)
   z = tf.reshape(mixture.sample(), shape=(-1, rnn.args.z_size))
-  
+
   if rnn.args.rnn_r_pred == 0:
     r = 1.0 # For Doom Reward is always 1.0 if the agent is alive
   return rnn_state, z, r, d
