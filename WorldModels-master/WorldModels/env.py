@@ -10,9 +10,9 @@ from gym.spaces.box import Box
 #from gym.envs.box2d.car_racing import CarRacing
 from CarRacing import CarRacing
 from rnn.rnn import rnn_output
-#tf._eager_execution(
-#    config=None, device_policy=None, execution_mode=None
-#)
+tf.enable_eager_execution(
+    config=None, device_policy=None, execution_mode=None
+)
 class CarRacingWrapper(CarRacing):
   def __init__(self, full_episode=False):
     super(CarRacingWrapper, self).__init__()

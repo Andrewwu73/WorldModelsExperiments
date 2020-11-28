@@ -43,7 +43,7 @@ if not os.path.exists(initial_z_save_path):
   os.makedirs(initial_z_save_path)
 initial_mu = []
 initial_logvar = []
-for i in range(745):
+for i in range(1000):
   mu = np.copy(data_mu[i][0, :]*10000).astype(np.int).tolist()
   logvar = np.copy(data_logvar[i][0, :]*10000).astype(np.int).tolist()
   initial_mu.append(mu)
@@ -55,7 +55,7 @@ def ds_gen():
   for _ in range(args.rnn_num_steps):
     indices = np.random.permutation(N_data)[0:args.rnn_batch_size]
     # suboptimal b/c we are always only taking first set of steps
-    mu = data_mu[indices][:, :args.rnn_max_seq_len]
+    mu = data_mu[indices][:, :args.rnn_max_seq_len] 
     logvar = data_logvar[indices][:, :args.rnn_max_seq_len]
     action = data_action[indices][:, :args.rnn_max_seq_len]
     z = sample_vae(mu, logvar)
@@ -63,7 +63,7 @@ def ds_gen():
     d = tf.cast(data_d[indices], tf.float16)[:, :args.rnn_max_seq_len]
     N = tf.cast(data_N[indices], tf.float16)[:, :args.rnn_max_seq_len]
     yield z, action, r, d, N
-
+    
 dataset = tf.data.Dataset.from_generator(ds_gen, output_types=(tf.float16, tf.float16, tf.float16, tf.float16, tf.float16), \
     output_shapes=((args.rnn_batch_size, args.rnn_max_seq_len, args.z_size), \
     (args.rnn_batch_size, args.rnn_max_seq_len, args.a_width), \
@@ -86,19 +86,18 @@ step = 0
 for raw_z, raw_a, raw_r, raw_d, raw_N in dataset:
     curr_learning_rate = (args.rnn_learning_rate-args.rnn_min_learning_rate) * (args.rnn_decay_rate) ** step + args.rnn_min_learning_rate
     rnn.optimizer.learning_rate = curr_learning_rate
-
+    
     inputs = tf.concat([raw_z, raw_a], axis=2)
 
     if step == 0:
         rnn._set_inputs(inputs)
-    outputs = {}
-    for i in range(args.rnn_num_time_steps):
-        dummy_zero = tf.zeros([raw_z.shape[0], i+1, raw_z.shape[2]], dtype=tf.float16)
-        z_targ = tf.concat([raw_z[:, i+1:, :], dummy_zero], axis=1) # zero pad the end but we don't actually use it
-        z_mask = 1.0 - raw_d
-        z_targ = tf.concat([z_targ, z_mask], axis=2) # use a signal to not pass grad
-        outputs['MDN'+str(i)] = z_targ
-    #outputs = {'MDN': z_targ}
+
+    dummy_zero = tf.zeros([raw_z.shape[0], 1, raw_z.shape[2]], dtype=tf.float16)
+    z_targ = tf.concat([raw_z[:, 1:, :], dummy_zero], axis=1) # zero pad the end but we don't actually use it
+    z_mask = 1.0 - raw_d
+    z_targ = tf.concat([z_targ, z_mask], axis=2) # use a signal to not pass grad
+
+    outputs = {'MDN': z_targ}
     if args.rnn_r_pred == 1:
         r_mask = tf.concat([tf.ones([args.rnn_batch_size, 1, 1], dtype=tf.float16), 1.0 - raw_d[:, :-1, :]], axis=1)
         r_targ = tf.concat([raw_r, r_mask], axis=2)
