@@ -448,12 +448,12 @@ class CarRacing(gym.Env, EzPickle):
 
         gl.glViewport(0, 0, VP_W, VP_H)
         t.enable()
-        #self.render_road()
+        self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
         self.viewer.onetime_geoms = []
         t.disable()
-        #self.render_indicators(WINDOW_W, WINDOW_H)
+        self.render_indicators(WINDOW_W, WINDOW_H)
 
         if mode == "human":
             win.flip()
@@ -519,7 +519,7 @@ class CarRacing(gym.Env, EzPickle):
         vl = pyglet.graphics.vertex_list(
             len(polygons_) // 3, ("v3f", polygons_), ("c4f", colors)  # gl.GL_QUADS,
         )
-        #vl.draw(gl.GL_QUADS)
+        vl.draw(gl.GL_QUADS)
 
     def render_indicators(self, W, H):
         s = W / 40.0
@@ -580,7 +580,7 @@ class CarRacing(gym.Env, EzPickle):
         vl = pyglet.graphics.vertex_list(
             len(polygons) // 3, ("v3f", polygons), ("c4f", colors)  # gl.GL_QUADS,
         )
-        #vl.draw(gl.GL_QUADS)
+        vl.draw(gl.GL_QUADS)
         self.score_label.text = "%04i" % self.reward
         self.score_label.draw()
 
