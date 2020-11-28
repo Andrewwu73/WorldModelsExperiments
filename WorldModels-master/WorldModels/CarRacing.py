@@ -88,7 +88,6 @@ class FrictionDetector(contactListener):
             obj = u1
         if not tile:
             return
-
         tile.color[0] = ROAD_COLOR[0]
         tile.color[1] = ROAD_COLOR[1]
         tile.color[2] = ROAD_COLOR[2]
@@ -98,7 +97,7 @@ class FrictionDetector(contactListener):
             obj.tiles.add(tile)
             if not tile.road_visited:
                 tile.road_visited = True
-                self.env.reward += 1000.0 / len(self.env.track)
+                self.env.reward += 1000.0 / len(self.env.track)#-math.sin(abs(tile.angle-obj.angle))
                 self.env.tile_visited_count += 1
         else:
             obj.tiles.remove(tile)
@@ -167,7 +166,6 @@ class CarRacing(gym.Env, EzPickle):
 
             checkpoints.append((alpha, rad * math.cos(alpha), rad * math.sin(alpha)))
         self.road = []
-
         # Go from one checkpoint to another to create track
         x, y, beta = 1.5 * TRACK_RAD, 0, 0
         dest_i = 0
@@ -228,7 +226,6 @@ class CarRacing(gym.Env, EzPickle):
             no_freeze -= 1
             if no_freeze == 0:
                 break
-
         # Find closed loop range i1..i2, first loop should be ignored, second is OK
         i1, i2 = -1, -1
         i = len(track)
@@ -279,6 +276,7 @@ class CarRacing(gym.Env, EzPickle):
                 border[i - neg] |= border[i]
 
         # Create tiles
+        
         for i in range(len(track)):
             alpha1, beta1, x1, y1 = track[i]
             alpha2, beta2, x2, y2 = track[i - 1]
@@ -375,6 +373,7 @@ class CarRacing(gym.Env, EzPickle):
             # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.car.fuel_spent = 0.0
             step_reward = self.reward - self.prev_reward
+            #print(self.hull.angle-self.
             self.prev_reward = self.reward
             if self.tile_visited_count == len(self.track):
                 done = True
